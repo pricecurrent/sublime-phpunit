@@ -149,6 +149,24 @@ class RunDuskTestsInDirCommand(PhpunitTestCommand):
         self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + 'php artisan dusk ' + directory)
 
 
+class RunPintOnCurrentFileCommand(PhpunitTestCommand):
+
+    def find_pint_bin(self, directory):
+        binpath = os.path.realpath(directory + "/vendor/bin/pint")
+
+        if os.path.isfile(binpath.replace("\\", "")):
+            return binpath
+        else:
+            return 'vendor/bin/pint'
+
+    def run(self, *args, **kwargs):
+        file_name, phpunit_config_path, phpunit_bin, active_view, directory = self.get_paths()
+
+        pint_bin = self.find_pint_bin(phpunit_config_path)
+
+        self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + pint_bin + ' ' + file_name)
+
+
 class FindMatchingTestCommand(sublime_plugin.WindowCommand):
 
     def path_leaf(self, path):
