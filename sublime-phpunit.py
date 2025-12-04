@@ -84,6 +84,14 @@ class PhpunitTestCommand(sublime_plugin.WindowCommand):
         self.lastTestCommand = command
         os.system(osascript_command)
 
+        # Auto-focus Sublime Text if setting is enabled
+        if self.get_setting('sublime-text-autofocus', False):
+            self.focus_sublime_text()
+
+    def focus_sublime_text(self):
+        focus_command = 'osascript -e "tell application \\"System Events\\" to keystroke tab using {command down}"'
+        os.system(focus_command)
+
 class RunPhpunitTestCommand(PhpunitTestCommand):
 
     def run(self, *args, **kwargs):
