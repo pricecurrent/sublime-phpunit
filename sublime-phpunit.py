@@ -85,26 +85,50 @@ class PhpunitTestCommand(sublime_plugin.WindowCommand):
         os.system(osascript_command)
 
         # Auto-focus Sublime Text if setting is enabled
-        if self.get_setting('sublime-text-autofocus', False):
+        if self.get_setting('phpunit-sublime-autofocus-after-run', False):
             self.focus_sublime_text()
 
     def focus_sublime_text(self):
         focus_command = 'osascript -e "tell application \\"System Events\\" to keystroke tab using {command down}"'
         os.system(focus_command)
 
+    def get_docker_service(self):
+        view = self.window.active_view()
+        if view:
+            return view.settings().get('phpunit-sublime-docker-service')
+        return None
+
+    def relative_path(self, path, base):
+        clean_path = path.replace('\\ ', ' ')
+        clean_base = base.replace('\\ ', ' ')
+        rel = os.path.relpath(clean_path, clean_base)
+        return rel.replace(' ', '\\ ')
+
+    def docker_cmd(self, service):
+        return 'docker compose exec -e XDEBUG_MODE=off ' + service
+
 class RunPhpunitTestCommand(PhpunitTestCommand):
 
     def run(self, *args, **kwargs):
         file_name, phpunit_config_path, phpunit_bin, active_view, directory = self.get_paths()
 
-        self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + phpunit_bin + ' ' + file_name)
+        docker_service = self.get_docker_service()
+        if docker_service:
+            rel_file = self.relative_path(file_name, phpunit_config_path)
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + self.docker_cmd(docker_service) + ' php vendor/bin/phpunit ' + rel_file)
+        else:
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + phpunit_bin + ' ' + file_name)
 
 class RunAllPhpunitTestsCommand(PhpunitTestCommand):
 
     def run(self, *args, **kwargs):
         file_name, phpunit_config_path, phpunit_bin, active_view, directory = self.get_paths()
 
-        self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + phpunit_bin)
+        docker_service = self.get_docker_service()
+        if docker_service:
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + self.docker_cmd(docker_service) + ' php vendor/bin/phpunit')
+        else:
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + phpunit_bin)
 
 
 class RunSinglePhpunitTestCommand(PhpunitTestCommand):
@@ -114,7 +138,13 @@ class RunSinglePhpunitTestCommand(PhpunitTestCommand):
 
         current_function = self.get_current_function(active_view)
 
-        self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + phpunit_bin + ' ' + file_name + " --filter '/::" + current_function + "$/'")
+        docker_service = self.get_docker_service()
+        if docker_service:
+            rel_file = self.relative_path(file_name, phpunit_config_path)
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + self.docker_cmd(docker_service) + ' php vendor/bin/phpunit ' + rel_file + " --filter '/::" + current_function + "$/'")
+        else:
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + phpunit_bin + ' ' + file_name + " --filter '/::" + current_function + "$/'")
+
 
 class RunLastPhpunitTestCommand(PhpunitTestCommand):
 
@@ -131,7 +161,12 @@ class RunPhpunitTestsInDirCommand(PhpunitTestCommand):
     def run(self, *args, **kwargs):
         file_name, phpunit_config_path, phpunit_bin, active_view, directory = self.get_paths()
 
-        self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + phpunit_bin + ' ' + directory)
+        docker_service = self.get_docker_service()
+        if docker_service:
+            rel_dir = self.relative_path(directory, phpunit_config_path.replace('\\ ', ' '))
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + self.docker_cmd(docker_service) + ' php vendor/bin/phpunit ' + rel_dir)
+        else:
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + phpunit_bin + ' ' + directory)
 
 class RunSingleDuskTestCommand(PhpunitTestCommand):
 
@@ -140,21 +175,35 @@ class RunSingleDuskTestCommand(PhpunitTestCommand):
 
         current_function = self.get_current_function(active_view)
 
-        self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + 'php artisan dusk ' + file_name + ' --filter ' + current_function)
+        docker_service = self.get_docker_service()
+        if docker_service:
+            rel_file = self.relative_path(file_name, phpunit_config_path)
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + self.docker_cmd(docker_service) + ' php artisan dusk ' + rel_file + ' --filter ' + current_function)
+        else:
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + 'php artisan dusk ' + file_name + ' --filter ' + current_function)
 
 class RunAllDuskTestsCommand(PhpunitTestCommand):
 
     def run(self, *args, **kwargs):
         file_name, phpunit_config_path, active_view, directory = self.get_paths()
 
-        self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + 'php artisan dusk')
+        docker_service = self.get_docker_service()
+        if docker_service:
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + self.docker_cmd(docker_service) + ' php artisan dusk')
+        else:
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + 'php artisan dusk')
 
 class RunDuskTestsInDirCommand(PhpunitTestCommand):
 
     def run(self, *args, **kwargs):
         file_name, phpunit_config_path, active_view, directory = self.get_paths()
 
-        self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + 'php artisan dusk ' + directory)
+        docker_service = self.get_docker_service()
+        if docker_service:
+            rel_dir = self.relative_path(directory, phpunit_config_path.replace('\\ ', ' '))
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + self.docker_cmd(docker_service) + ' php artisan dusk ' + rel_dir)
+        else:
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + 'php artisan dusk ' + directory)
 
 
 class RunPintOnCurrentFileCommand(PhpunitTestCommand):
@@ -172,7 +221,12 @@ class RunPintOnCurrentFileCommand(PhpunitTestCommand):
 
         pint_bin = self.find_pint_bin(phpunit_config_path)
 
-        self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + pint_bin + ' ' + file_name)
+        docker_service = self.get_docker_service()
+        if docker_service:
+            rel_file = self.relative_path(file_name, phpunit_config_path)
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + self.docker_cmd(docker_service) + ' php vendor/bin/pint ' + rel_file)
+        else:
+            self.run_in_terminal('cd ' + phpunit_config_path + self.get_cmd_connector() + pint_bin + ' ' + file_name)
 
 
 class FindMatchingTestCommand(sublime_plugin.WindowCommand):
